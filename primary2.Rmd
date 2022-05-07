@@ -222,6 +222,53 @@ control <- trainControl(method = 'cv', number = 5)
 #rfAUC3
 ```
 
+### Support Vector Machine
+
+
+```{r}
+#preprocessParams <- preProcess(train_data, method = c("scale","center"))
+#print(preprocessParams)
+
+```
+
+
+
+```{r}
+# Tune the cost and gamma parameters for radial kernel
+start_t <- Sys.time()
+cat("",cat(" RBF SVM Training started at:",format(start_t, "%a %b %d %X %Y")))
+
+tune_svm_radial <- tune(svm, IsUseful ~ ., data = train_data,
+                       kernel = 'radial',
+                       tunecontrol=tune.control(cross=10,sampling="cross"),
+  #                     ranges =list(cost=10^(2),gamma=10^(-2)))
+                       ranges =list(cost=10^(-2:2),gamma=10^(-2:2)))
+finish_t <- Sys.time()
+cat("",cat("RBF SVM Training finished at:",format(finish_t, "%a %b %d %X %Y")))
+
+cat("The RBF SVM training process finished in",difftime(finish_t,start_t,units="mins"), "minutes")
+
+
+# Print the best parameters
+tune_svm_radial$best.parameters
+```
+
+```{r} 
+#Austin Check accuracy score against test data.
+rf_yhat3 <- predict(tune_svm_radial$best.model, newdata = test_data, type="prob")
+
+summary(rf_yhat3)
+#print(rf_yhat3)
+#print(test_data$IsUseful)
+summary(test_data$IsUseful)
+
+#Why is this misdimensioned? grrr.
+#result.rocSVM <- roc(test_data$IsUseful, rf_yhat3[,1])
+#plot(result.rocSVM, print.thres="best", print.thres.best.method="closest.topleft", print.auc=TRUE)
+#rfAUC3 <- auc(result.roc3)
+#rfAUC3
+```
+
 
 ```{r}
 #stopCluster(cl)
