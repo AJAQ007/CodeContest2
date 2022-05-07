@@ -1,0 +1,63 @@
+---
+title: "primary1"
+author: "Austin Funcheon and Viraj Rane"
+date: "5/6/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Data Preparation
+
+```{r}
+# Importing all libraries
+library(caret)
+library(ggplot2)
+library(tidyr)
+library(dplyr)
+library(randomForest)
+library(lattice)
+library(lubridate)
+library(smotefamily)
+library(ROSE)
+library(tree)
+library(snow)
+library(caret)
+library(doParallel)
+library(vtable)
+cl <- makePSOCKcluster(detectCores() -1)
+registerDoParallel(cl)
+set.seed(123)
+
+
+```
+
+
+```{r}
+df <- read.csv("train.csv")
+#sumtable(df)
+#str(df)
+head(df)
+```
+```{r}
+sumtable(df, out="csv", file='data summary2', group = 'IsUseful')
+```
+```{r}
+sum(is.na(df))
+table(df$IsUseful)
+```
+
+
+
+
+
+
+
+```{r}
+stopCluster(cl)
+```
+
+
+
