@@ -28,6 +28,8 @@ library(caret)
 library(doParallel)
 library(vtable)
 library(unbalanced)
+library(pROC)
+library(ROCR)
 cl <- makePSOCKcluster(detectCores() -1)
 registerDoParallel(cl)
 set.seed(123)
@@ -40,6 +42,8 @@ set.seed(123)
 df <- read.csv("train.csv")
 dfOriginal <- df
 df$Id <- NULL
+factors <- c("IsUseful")
+df[factors] <- lapply(df[factors], factor)
 #sumtable(df)
 #str(df)
 head(df)
@@ -119,10 +123,16 @@ rf_Imp_SO <- rf_Imp_Sort[order(-rf_Imp_Sort$cross),]
 
 ```{r} 
 #Austin Check accuracy score against test data.
-rf_yhat <- predict(rf_eval, newdata = test_data)
+rf_yhat <- predict(rf_eval, newdata = test_data, type="prob")
 #accuracy score of mtry 5 rf used for variable selection
 rfscore <- postResample(rf_yhat, test_data$IsUseful)
 print(rfscore)
+
+#Viraj check this think this is auc with IsUseful=1
+result.roc <- roc(test_data$IsUseful, rf_yhat[,1])
+plot(result.roc, print.thres="best", print.thres.best.method="closest.topleft", print.auc=TRUE)
+rfAUC <- auc(result.roc)
+
 ```
 
 
