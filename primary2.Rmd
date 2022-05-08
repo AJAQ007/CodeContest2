@@ -269,6 +269,16 @@ summary(test_data$IsUseful)
 #rfAUC3
 ```
 
+```{r}
+nb <- naive_bayes(IsUseful ~ ., data = train_data, usekernel = T) 
+nb_Out<- predict(nb, newdata = test_data, type="prob")
+
+result.roc4 <- roc(test_data$IsUseful, nb_Out[,1])
+plot(result.roc4, print.thres="best", print.thres.best.method="closest.topleft", print.auc=TRUE)
+rfAUC4 <- auc(result.roc4)
+rfAUC4
+```
+
 
 ```{r}
 #stopCluster(cl)
