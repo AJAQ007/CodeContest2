@@ -31,6 +31,7 @@ library(pROC)
 library(ROCR)
 library(naivebayes)
 library(e1071)
+library(neuralnet)
 cl <- makePSOCKcluster(detectCores() -1)
 registerDoParallel(cl)
 set.seed(123)
@@ -156,7 +157,7 @@ test_trim_data <- test_data[ , ! names(test_data) %in% dropVar]
 
 
 ```{r}
-#Austin  #30 second run time with 4 cores
+#Austin  # 1 minute run time
 start_t <- Sys.time()
 cat("",cat("Trimmed Training started at:",format(start_t, "%a %b %d %X %Y")))
 
@@ -254,30 +255,108 @@ tune_svm_radial$best.parameters
 ```
 
 ```{r} 
-#Austin Check accuracy score against test data.
-rf_yhat3 <- predict(tune_svm_radial$best.model, newdata = test_data, type="prob")
+#Check accuracy score against test data.
+svm_yhat <- predict(tune_svm_radial$best.model, newdata = test_data, type="prob")
+#str(svm_yhat)
+#ref <- as.numeric(as.factor(svm_yhat))
+#ref
+#str(ref)
+ref <- as.data.frame(svm_yhat)
+ref
+#str(test_data$IsUseful)
+#as.numeric(rf_yhat3)
 
-summary(rf_yhat3)
-#print(rf_yhat3)
-#print(test_data$IsUseful)
-summary(test_data$IsUseful)
 
-#Why is this misdimensioned? grrr.
-#result.rocSVM <- roc(test_data$IsUseful, rf_yhat3[,1])
-#plot(result.rocSVM, print.thres="best", print.thres.best.method="closest.topleft", print.auc=TRUE)
-#rfAUC3 <- auc(result.roc3)
-#rfAUC3
+#this is wrong. coded 2 and 1 instead of 0 and 1 Viraj idiot proof me I can't figure it out.
+result.rocSVM <- roc(test_data$IsUseful, as.numeric(as.factor(svm_yhat)))
+table(test_data$IsUseful)
+table(as.numeric(svm_yhat))
+
+plot(result.rocSVM, print.thres="best", print.thres.best.method="closest.topleft", print.auc=TRUE)
+rfAUC3 <- auc(result.rocSVM)
+rfAUC3
 ```
 
 ```{r}
+#Naieve Bayes
 nb <- naive_bayes(IsUseful ~ ., data = train_data, usekernel = T) 
 nb_Out<- predict(nb, newdata = test_data, type="prob")
+nb_OutC <- ifelse(nb_Out > 0.5, 1, 0)
+#table(nb_Out[,1])
 
-result.roc4 <- roc(test_data$IsUseful, nb_Out[,1])
+result.roc4 <- roc(test_data$IsUseful, nb_OutC[,1])
 plot(result.roc4, print.thres="best", print.thres.best.method="closest.topleft", print.auc=TRUE)
-rfAUC4 <- auc(result.roc4)
-rfAUC4
+nbAUC <- auc(result.roc4)
+nbAUC
 ```
+```{r}
+
+f <- as.formula(IsUseful ~ .)
+
+# Fit a neural network model with 2 hidden layers
+nn_fit_2 <- neuralnet(f, data = train_data, hidden = c(2,1), linear.output=TRUE) # 45- 50 mins
+
+# Show results
+summary(nn_fit_2)
+
+```
+
+
+```{r, fig.height=6, fig.width=7}
+plot(nn_fit_2,rep="best", cex=0.8)
+```
+
+```{r}
+# Fit a neural network model with 1 hidden layer
+nn_fit_1 <- neuralnet(f, data = train_scaled, hidden = 2) # 20 mins
+
+# Show results
+summary(nn_fit_1)
+```
+
+```{r,fig.height=6, fig.width=7}
+#plotting neural net model with 2 hidden layers
+plot(nn_fit_1, rep="best",cex=0.8)
+```
+
+# Evaluating Predictive Performance of the Two-Hidden-Layer Model
+
+We use compute() method in the neuralnet package for predicting the performance.
+
+```{r}
+# Computing the outputs of all neurons for specific arbitrary co variate vectors given a trained neural network
+pred2 <- compute(nn_fit_2, test_data[-1])
+pred2 <- pred2$net.result
+str(pred2)
+```
+
+Calculating the prediction performance.
+```{r}
+result.roc5 <- roc(test_data$IsUseful, pred2[,1])
+plot(result.roc5, print.thres="best", print.thres.best.method="closest.topleft", print.auc=TRUE)
+annAUC <- auc(result.roc5)
+annAUC
+```
+
+# Evaluating Predictive Performance of the One-Hidden-Layer Model
+
+```{r}
+# Computes the outputs of all neurons for specific arbitrary co variate vectors given a trained neural network
+pred1 <- compute(nn_fit_1, test_data[-1])
+pred1 <- pred1$net.result
+```
+
+Calculating the prediction performance.
+
+```{r}
+options(scipen=999)
+result.roc6 <- roc(test_data$IsUseful, pred1[,1])
+plot(result.roc6, print.thres="best", print.thres.best.method="closest.topleft", print.auc=TRUE)
+ann1AUC <- auc(result.roc6)
+ann1AUC
+```
+
+
 
 
 ```{r}
