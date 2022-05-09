@@ -360,7 +360,25 @@ ann1AUC <- auc(result.roc6)
 ann1AUC
 ```
 
+```{r}
+#Create Validation Set
+val_data <- read.csv("test.csv")
+valOriginal <- val_data
+val$Id <- NULL
+val_data[factors] <- lapply(val_data[factors], factor)
+```
 
+
+```{r} 
+#Austin Final model check
+#valFinal <- predict(<Insert model here>, newdata = val_data, type="prob")
+
+#Viraj check this think this is auc with IsUseful=1
+#result.rocF <- roc(valFinal$IsUseful, <Insert model here>[,1])
+#plot(result.rocF, print.thres="best", print.thres.best.method="closest.topleft", print.auc=TRUE)
+#AUCF <- auc(result.rocf)
+#AUCF
+```
 
 
 ```{r}
