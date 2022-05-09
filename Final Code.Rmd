@@ -1,0 +1,101 @@
+---
+title: "Final Code"
+author: "Austin Funcheon & Viraj Rane"
+date: "5/8/2022"
+output: html_document
+---
+
+# Data Preparation
+
+```{r}
+# Importing all libraries
+
+library(ggplot2)
+library(tidyr)
+library(dplyr)
+library(randomForest)
+library(caret)
+library(lattice)
+library(lubridate)
+library(smotefamily)
+library(ROSE)
+library(tree)
+library(snow)
+library(doParallel)
+library(vtable)
+library(unbalanced)
+library(pROC)
+library(ROCR)
+library(naivebayes)
+library(e1071)
+library(neuralnet)
+library(mlbench)
+cl <- makePSOCKcluster(detectCores() -1)
+registerDoParallel(cl)
+set.seed(123)
+
+
+```
+
+
+```{r}
+df <- read.csv("train.csv")
+dfOriginal <- df
+df$Id <- NULL
+factors <- c("IsUseful")
+df[factors] <- lapply(df[factors], factor)
+```
+
+IsUseful
+   0    1 
+ 452 3548
+Data is highly unbalanced.
+
+```{r}
+#Austin
+df0 <- df
+train <- sample(1:nrow(df), nrow(df)*0.8)
+train_data <- df[train,]
+test_data <- df[-train,]
+
+outcome <- table(train_data$IsUseful)
+#outcome identify count of !ISUseful as minority class
+train_data0 <- train_data
+#train_data0
+
+minCount <- outcome[names(outcome)==0]
+#minCount
+dfBal <- ovun.sample(IsUseful~., data = train_data, method = "under", N = minCount*2)$data
+
+df0Bal <- dfBal
+train_data <- dfBal
+
+table(train_data$IsUseful)
+
+```
+#### VIRAJ ###
+<Insert final method here Viraj>
+
+```{r}
+#Create Validation Set
+val_data <- read.csv("test.csv")
+valOriginal <- val_data
+val_data$Id <- NULL
+val_data[factors] <- lapply(val_data[factors], factor)
+```
+
+
+```{r} 
+#Austin Final model check
+#valFinal <- predict(<Insert model here>, newdata = val_data, type="prob")
+
+#Viraj check this think this is auc with IsUseful=1
+#result.rocF <- roc(valFinal$IsUseful, <Insert model here>[,1])
+#plot(result.rocF, print.thres="best", print.thres.best.method="closest.topleft", print.auc=TRUE)
+#AUCF <- auc(result.rocf)
+#AUCF
+```
+
+```{r}
+stopCluster(cl)
+```

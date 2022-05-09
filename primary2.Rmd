@@ -50,7 +50,7 @@ factors <- c("IsUseful")
 df[factors] <- lapply(df[factors], factor)
 #sumtable(df)
 #str(df)
-head(df)
+ncol(df)
 ```
 
 ```{r}
@@ -61,7 +61,7 @@ head(df)
 sum(is.na(df))
 #no NAs
 #table(df$IsUseful)
-
+str(df)
 ```
 IsUseful
    0    1 
@@ -149,9 +149,14 @@ rfAUC
 ```{r}
 #Austin 
 rfVarDrop <-rf_Imp_Sort
-#trim the less than chance predictors
-rfVarDrop <- rfVarDrop %>% filter(MeanDecreaseAccuracy <= 0)
+#trim the less than chance predictors, theoretically negative MDA don't contribute
+#rfVarDrop <- rfVarDrop %>% filter(MeanDecreaseAccuracy <= 0)
 
+#Setting rank cutoff points Viraj, tried several for comparison.
+#rem <- round(ncol(df)*.1,0)
+rem <- round(ncol(df)*.2,0)
+rfVarDrop <- rfVarDrop %>% filter(rank <= rem)
+rfVarDrop <- rfVarDrop %>% filter(rank <= rem)
 dropVar <- row.names(rfVarDrop) #Variables to drop list 
 #dropVar
 #make a shorter list of variables from rf variable selection
@@ -179,9 +184,6 @@ cat("Trimmed The training process finished in",difftime(finish_t,start_t,units="
 ```{r} 
 #Austin Check accuracy score against test data.
 rf_yhat2 <- predict(rf_eval2, newdata = test_trim_data, type="prob")
-#accuracy score of mtry 5 rf used for variable selection
-#rfscore2 <- postResample(rf_yhat, test_data$IsUseful)
-#print(rfscore2)
 
 #Viraj check this think this is auc with IsUseful=1
 result.roc2 <- roc(test_trim_data$IsUseful, rf_yhat2[,1])
@@ -189,6 +191,8 @@ plot(result.roc2, print.thres="best", print.thres.best.method="closest.topleft",
 rfAUC2 <- auc(result.roc2)
 rfAUC2
 ```
+10% trim: 0.5745
+20% trim: 0.5745
 
 
 ```{r}
@@ -358,26 +362,6 @@ result.roc6 <- roc(test_data$IsUseful, pred1[,1])
 plot(result.roc6, print.thres="best", print.thres.best.method="closest.topleft", print.auc=TRUE)
 ann1AUC <- auc(result.roc6)
 ann1AUC
-```
-
-```{r}
-#Create Validation Set
-val_data <- read.csv("test.csv")
-valOriginal <- val_data
-val$Id <- NULL
-val_data[factors] <- lapply(val_data[factors], factor)
-```
-
-
-```{r} 
-#Austin Final model check
-#valFinal <- predict(<Insert model here>, newdata = val_data, type="prob")
-
-#Viraj check this think this is auc with IsUseful=1
-#result.rocF <- roc(valFinal$IsUseful, <Insert model here>[,1])
-#plot(result.rocF, print.thres="best", print.thres.best.method="closest.topleft", print.auc=TRUE)
-#AUCF <- auc(result.rocf)
-#AUCF
 ```
 
 
