@@ -158,8 +158,8 @@ rfVarDrop <-rf_Imp_Sort
 #rem <- round(ncol(df)*.5,0)
 #rem <- round(ncol(df)*.7,0)
 #rem <- round(ncol(df)*.15,0)
-#rem <- round(ncol(df)*.05,0)
-rem <- round(ncol(df)*.07,0)
+rem <- round(ncol(df)*.05,0)
+#rem <- round(ncol(df)*.07,0)
 rfVarDrop <- rfVarDrop %>% filter(rank <= rem)
 dropVar <- row.names(rfVarDrop) #Variables to drop list 
 #dropVar
@@ -220,6 +220,7 @@ control <- trainControl(method = 'repeatedcv',
 start_t <- Sys.time()
 cat("",cat("Training started at:",format(start_t, "%a %b %d %X %Y")))
 
+#Fix tuned? Viraj
 #rf_tuned <- train(IsUseful~ ., data = train_trim_data,
 #                  method = 'rf',
 #                  trControl = control,
