@@ -11,7 +11,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r}
 # Importing all libraries
-
+options(warn=-1)
 library(ggplot2)
 library(tidyr)
 library(dplyr)
@@ -185,11 +185,11 @@ val_data[factors] <- lapply(val_data[factors], factor)
 
 ```{r} 
 #Austin Final model check
-valFinal <- predict(<rf_eval2, newdata = val_data, type="prob")
+valFinal <- predict(rf_eval2, newdata = val_data, type="prob")
 
-result.rocF <- roc(valFinal$IsUseful, valFinal[,1])
+result.rocF <- roc(val_data$IsUseful, valFinal[,1])
 plot(result.rocF, print.thres="best", print.thres.best.method="closest.topleft", print.auc=TRUE)
-AUCF <- auc(result.rocf)
+AUCF <- auc(result.rocF)
 AUCF
 ```
 
