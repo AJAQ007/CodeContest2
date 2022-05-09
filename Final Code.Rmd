@@ -4,7 +4,9 @@ author: "Austin Funcheon & Viraj Rane"
 date: "5/8/2022"
 output: html_document
 ---
-
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
 # Data Preparation
 
 ```{r}
@@ -73,8 +75,104 @@ train_data <- dfBal
 table(train_data$IsUseful)
 
 ```
-#### VIRAJ ###
-<Insert final method here Viraj>
+```{r}
+#Austin
+start_t <- Sys.time()
+cat("",cat(" Variable selection Training started at:",format(start_t, "%a %b %d %X %Y")))
+
+#run a prelim rf for variable summary. 
+rf_eval <- randomForest(IsUseful~., data = train_data, ntree=2000,
+                           mtry = 5, importance = TRUE)
+
+#rf_eval
+varImpPlot(rf_eval) #plot relevance plot
+
+finish_t <- Sys.time()
+cat("",cat("Variable selection Training finished at:",format(finish_t, "%a %b %d %X %Y")))
+
+cat("Variable selection The training process finished in",difftime(finish_t,start_t,units="mins"), "minutes")
+
+```
+
+```{r} 
+#Austin Identify the lowest impact variables from the RF run
+rfImp <- importance(rf_eval)
+#rfImp
+
+rf_Imp_Sort <- as.data.frame.matrix(rfImp)
+#adds a column for accuracy*gini for overall variable impact
+#print(rf_Imp_Sort$MeanDecreaseAccuracy)
+#print(rf_Imp_Sort$MeanDecreaseGini)
+#rf_Imp_Sort$cross <- rf_Imp_Sort$MeanDecreaseAccuracy
+rf_Imp_Sort$cross <- rf_Imp_Sort$MeanDecreaseAccuracy*rf_Imp_Sort$MeanDecreaseGini
+#rf_Imp_Sort$cross
+#adds an overall rank of impact of variable, with bigger being biggest ranked impact, with 1 being lowest impact
+rf_Imp_Sort$rank <- rank(rf_Imp_Sort$cross)
+
+#rf_Imp_Sort
+
+#variables ranked by cross order
+rf_Imp_SO <- rf_Imp_Sort[order(-rf_Imp_Sort$cross),]
+#rf_Imp_SO
+#variable list sorted by importance. Accuracy * Gini
+```
+
+
+
+```{r}
+#Austin 
+rfVarDrop <-rf_Imp_Sort
+#trim the less than chance predictors, theoretically negative MDA don't contribute
+#rfVarDrop <- rfVarDrop %>% filter(MeanDecreaseAccuracy <= 0)
+
+#Setting rank cutoff points Viraj, tried several for comparison.
+rem <- round(ncol(df)*.05,0)
+rfVarDrop <- rfVarDrop %>% filter(rank <= rem)
+dropVar <- row.names(rfVarDrop) #Variables to drop list 
+#dropVar
+#make a shorter list of variables from rf variable selection
+train_trim_data <- train_data[ , ! names(train_data) %in% dropVar] 
+test_trim_data <- test_data[ , ! names(test_data) %in% dropVar] 
+```
+
+
+
+```{r}
+#Austin  # 1 minute run time
+start_t <- Sys.time()
+cat("",cat("Trimmed Training started at:",format(start_t, "%a %b %d %X %Y")))
+
+rf_eval2 <- randomForest(IsUseful~., data = train_trim_data, ntree=2000,
+                           mtry = 5, importance = TRUE)
+
+rf_eval2
+varImpPlot(rf_eval2)
+
+finish_t <- Sys.time()
+cat("",cat("Trimmed Training finished at:",format(finish_t, "%a %b %d %X %Y")))
+
+cat("Trimmed The training process finished in",difftime(finish_t,start_t,units="mins"), "minutes")
+```
+
+```{r} 
+#Austin Check accuracy score against test data.
+rf_yhat2 <- predict(rf_eval2, newdata = test_trim_data, type="prob")
+
+#Viraj check this think this is auc with IsUseful=1
+result.roc2 <- roc(test_trim_data$IsUseful, rf_yhat2[,1])
+plot(result.roc2, print.thres="best", print.thres.best.method="closest.topleft", print.auc=TRUE)
+rfAUC2 <- auc(result.roc2)
+rfAUC2
+```
+10% trim: 0.5745
+20% trim: 0.5707
+30% trim: 0.5711
+50% trim: 0.5642
+70% trim: 0.5531
+15% trim: 0.5701
+ 5% trim: 0.5776
+ 7% trim: 0.5742
+
 
 ```{r}
 #Create Validation Set
@@ -87,13 +185,12 @@ val_data[factors] <- lapply(val_data[factors], factor)
 
 ```{r} 
 #Austin Final model check
-#valFinal <- predict(<Insert model here>, newdata = val_data, type="prob")
+valFinal <- predict(<rf_eval2, newdata = val_data, type="prob")
 
-#Viraj check this think this is auc with IsUseful=1
-#result.rocF <- roc(valFinal$IsUseful, <Insert model here>[,1])
-#plot(result.rocF, print.thres="best", print.thres.best.method="closest.topleft", print.auc=TRUE)
-#AUCF <- auc(result.rocf)
-#AUCF
+result.rocF <- roc(valFinal$IsUseful, valFinal[,1])
+plot(result.rocF, print.thres="best", print.thres.best.method="closest.topleft", print.auc=TRUE)
+AUCF <- auc(result.rocf)
+AUCF
 ```
 
 ```{r}

@@ -1,5 +1,5 @@
 ---
-title: "primary1"
+title: "primary2"
 author: "Austin Funcheon and Viraj Rane"
 date: "5/6/2022"
 output: html_document
@@ -61,7 +61,7 @@ ncol(df)
 sum(is.na(df))
 #no NAs
 #table(df$IsUseful)
-str(df)
+#str(df)
 ```
 IsUseful
    0    1 
@@ -305,7 +305,7 @@ nbAUC <- auc(result.roc4)
 nbAUC
 ```
 ```{r}
-#Viraj
+#Viraj review
 f <- as.formula(IsUseful ~ .)
 
 # Fit a neural network model with 2 hidden layers
@@ -322,7 +322,7 @@ plot(nn_fit_2,rep="best", cex=0.8)
 
 ```{r}
 # Viraj Fit a neural network model with 1 hidden layer
-nn_fit_1 <- neuralnet(f, data = train_scaled, hidden = 2) # 20 mins
+nn_fit_1 <- neuralnet(f, data = train_data, hidden = 2) # 20 mins
 
 # Show results
 summary(nn_fit_1)
@@ -376,7 +376,7 @@ ann1AUC
 
 
 ```{r}
-#stopCluster(cl)
+stopCluster(cl)
 ```
 
 
