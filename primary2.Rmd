@@ -154,8 +154,12 @@ rfVarDrop <-rf_Imp_Sort
 
 #Setting rank cutoff points Viraj, tried several for comparison.
 #rem <- round(ncol(df)*.1,0)
-rem <- round(ncol(df)*.2,0)
-rfVarDrop <- rfVarDrop %>% filter(rank <= rem)
+#rem <- round(ncol(df)*.2,0)
+#rem <- round(ncol(df)*.5,0)
+#rem <- round(ncol(df)*.7,0)
+#rem <- round(ncol(df)*.15,0)
+#rem <- round(ncol(df)*.05,0)
+rem <- round(ncol(df)*.07,0)
 rfVarDrop <- rfVarDrop %>% filter(rank <= rem)
 dropVar <- row.names(rfVarDrop) #Variables to drop list 
 #dropVar
@@ -192,8 +196,13 @@ rfAUC2 <- auc(result.roc2)
 rfAUC2
 ```
 10% trim: 0.5745
-20% trim: 0.5745
-
+20% trim: 0.5707
+30% trim: 0.5711
+50% trim: 0.5642
+70% trim: 0.5531
+15% trim: 0.5701
+ 5% trim: 0.5776
+ 7% trim: 0.5742
 
 ```{r}
 tuneGrid <- data.frame(mtry = 1:9)
@@ -211,7 +220,7 @@ control <- trainControl(method = 'repeatedcv',
 start_t <- Sys.time()
 cat("",cat("Training started at:",format(start_t, "%a %b %d %X %Y")))
 
-#rf_tuned <- train(IsUseful~ ., data = train_data,
+#rf_tuned <- train(IsUseful~ ., data = train_trim_data,
 #                  method = 'rf',
 #                  trControl = control,
 #                  metric = 'ROC'
