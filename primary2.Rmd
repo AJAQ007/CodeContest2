@@ -13,11 +13,12 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r}
 # Importing all libraries
-library(caret)
+
 library(ggplot2)
 library(tidyr)
 library(dplyr)
 library(randomForest)
+library(caret)
 library(lattice)
 library(lubridate)
 library(smotefamily)
@@ -32,6 +33,7 @@ library(ROCR)
 library(naivebayes)
 library(e1071)
 library(neuralnet)
+library(mlbench)
 cl <- makePSOCKcluster(detectCores() -1)
 registerDoParallel(cl)
 set.seed(123)
@@ -67,6 +69,7 @@ IsUseful
 Data is highly unbalanced.
 
 ```{r}
+#Austin
 df0 <- df
 train <- sample(1:nrow(df), nrow(df)*0.8)
 train_data <- df[train,]
@@ -78,7 +81,7 @@ train_data0 <- train_data
 #train_data0
 
 minCount <- outcome[names(outcome)==0]
-minCount
+#minCount
 dfBal <- ovun.sample(IsUseful~., data = train_data, method = "under", N = minCount*2)$data
 
 df0Bal <- dfBal
@@ -88,6 +91,7 @@ table(train_data$IsUseful)
 
 ```
 ```{r}
+#Austin
 start_t <- Sys.time()
 cat("",cat(" Variable selection Training started at:",format(start_t, "%a %b %d %X %Y")))
 
@@ -145,7 +149,7 @@ rfAUC
 ```{r}
 #Austin 
 rfVarDrop <-rf_Imp_Sort
-#trim the bottom x predictors
+#trim the less than chance predictors
 rfVarDrop <- rfVarDrop %>% filter(MeanDecreaseAccuracy <= 0)
 
 dropVar <- row.names(rfVarDrop) #Variables to drop list 
@@ -188,29 +192,34 @@ rfAUC2
 
 
 ```{r}
-#Austin Run Tune on RF  took 8 minute s with 4:15
-tuneGrid <- data.frame(mtry = 4:15)
+tuneGrid <- data.frame(mtry = 1:9)
+#tuneGrid
+```
 
+```{r}
+#Austin
+control <- trainControl(method = 'repeatedcv', 
+                        number = 10,
+#                        classProbs = TRUE,
+                        repeats = 1)
 
-
-control <- trainControl(method = 'cv', number = 5)
 # print out system time before training
-#start_t <- Sys.time()
-#cat("",cat("RFtune Training started at:",format(start_t, "%a %b %d %X %Y")))
+start_t <- Sys.time()
+cat("",cat("Training started at:",format(start_t, "%a %b %d %X %Y")))
 
-#rftuned <- train(IsUseful ~ ., data = train_data,
-#              method = 'rf',
-#              trControl = control,
-#              tuneGrid = tuneGrid)
+#rf_tuned <- train(IsUseful~ ., data = train_data,
+#                  method = 'rf',
+#                  trControl = control,
+#                  metric = 'ROC'
+#                  tuneGrid = tuneGrid)
 
 # print out system time after training
-#finish_t <- Sys.time()
-#cat("",cat("RFTune Training finished at:",format(finish_t, "%a %b %d %X %Y")))
+finish_t <- Sys.time()
+cat("",cat("Training finished at:",format(finish_t, "%a %b %d %X %Y")))
 
-#cat(" RFTune The training process finished in",difftime(finish_t,start_t,units="mins"), "minutes")
+cat("The training process finished in",difftime(finish_t,start_t,units="mins"), "minutes")
 
-#print(rftrim_tuned)
-
+#print(rf_tuned)
 ```
 
 ```{r} 
@@ -227,6 +236,7 @@ control <- trainControl(method = 'cv', number = 5)
 
 
 ```{r}
+#no point in this segment for scaling?
 #preprocessParams <- preProcess(train_data, method = c("scale","center"))
 #print(preprocessParams)
 
@@ -235,7 +245,7 @@ control <- trainControl(method = 'cv', number = 5)
 
 
 ```{r}
-# Tune the cost and gamma parameters for radial kernel
+#Austin Tune the cost and gamma parameters for radial kernel
 start_t <- Sys.time()
 cat("",cat(" RBF SVM Training started at:",format(start_t, "%a %b %d %X %Y")))
 
@@ -255,22 +265,13 @@ tune_svm_radial$best.parameters
 ```
 
 ```{r} 
-#Check accuracy score against test data.
+#Austin Check accuracy score against test data.
 svm_yhat <- predict(tune_svm_radial$best.model, newdata = test_data, type="prob")
-#str(svm_yhat)
-#ref <- as.numeric(as.factor(svm_yhat))
-#ref
-#str(ref)
-ref <- as.data.frame(svm_yhat)
-ref
-#str(test_data$IsUseful)
-#as.numeric(rf_yhat3)
-
 
 #this is wrong. coded 2 and 1 instead of 0 and 1 Viraj idiot proof me I can't figure it out.
 result.rocSVM <- roc(test_data$IsUseful, as.numeric(as.factor(svm_yhat)))
-table(test_data$IsUseful)
-table(as.numeric(svm_yhat))
+#table(test_data$IsUseful)
+#table(as.numeric(svm_yhat))
 
 plot(result.rocSVM, print.thres="best", print.thres.best.method="closest.topleft", print.auc=TRUE)
 rfAUC3 <- auc(result.rocSVM)
@@ -278,7 +279,7 @@ rfAUC3
 ```
 
 ```{r}
-#Naieve Bayes
+#Austin Naive Bayes 
 nb <- naive_bayes(IsUseful ~ ., data = train_data, usekernel = T) 
 nb_Out<- predict(nb, newdata = test_data, type="prob")
 nb_OutC <- ifelse(nb_Out > 0.5, 1, 0)
@@ -290,12 +291,11 @@ nbAUC <- auc(result.roc4)
 nbAUC
 ```
 ```{r}
-
+#Viraj
 f <- as.formula(IsUseful ~ .)
 
 # Fit a neural network model with 2 hidden layers
-nn_fit_2 <- neuralnet(f, data = train_data, hidden = c(2,1), linear.output=TRUE) # 45- 50 mins
-
+nn_fit_2 <- neuralnet(f, data = train_data, hidden = c(2,1), linear.output=TRUE) 
 # Show results
 summary(nn_fit_2)
 
@@ -307,7 +307,7 @@ plot(nn_fit_2,rep="best", cex=0.8)
 ```
 
 ```{r}
-# Fit a neural network model with 1 hidden layer
+# Viraj Fit a neural network model with 1 hidden layer
 nn_fit_1 <- neuralnet(f, data = train_scaled, hidden = 2) # 20 mins
 
 # Show results
@@ -324,6 +324,7 @@ plot(nn_fit_1, rep="best",cex=0.8)
 We use compute() method in the neuralnet package for predicting the performance.
 
 ```{r}
+#viraj
 # Computing the outputs of all neurons for specific arbitrary co variate vectors given a trained neural network
 pred2 <- compute(nn_fit_2, test_data[-1])
 pred2 <- pred2$net.result
@@ -332,6 +333,7 @@ str(pred2)
 
 Calculating the prediction performance.
 ```{r}
+#viraj
 result.roc5 <- roc(test_data$IsUseful, pred2[,1])
 plot(result.roc5, print.thres="best", print.thres.best.method="closest.topleft", print.auc=TRUE)
 annAUC <- auc(result.roc5)
@@ -341,6 +343,7 @@ annAUC
 # Evaluating Predictive Performance of the One-Hidden-Layer Model
 
 ```{r}
+#Viraj
 # Computes the outputs of all neurons for specific arbitrary co variate vectors given a trained neural network
 pred1 <- compute(nn_fit_1, test_data[-1])
 pred1 <- pred1$net.result
@@ -349,6 +352,7 @@ pred1 <- pred1$net.result
 Calculating the prediction performance.
 
 ```{r}
+#Viraj
 options(scipen=999)
 result.roc6 <- roc(test_data$IsUseful, pred1[,1])
 plot(result.roc6, print.thres="best", print.thres.best.method="closest.topleft", print.auc=TRUE)
