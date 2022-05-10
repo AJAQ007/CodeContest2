@@ -1,0 +1,533 @@
+---
+title: "Homework11_data competion_main"
+author: "Austin Funcheon and Viraj Rane"
+date: "5/9/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# loading libraries
+```{r}
+# Importing all libraries
+library(caret)
+library(ggplot2)
+library(tidyr)
+library(dplyr)
+library(tree)
+library(ROSE)
+library(randomForest)
+library(lubridate)
+library(e1071)
+library(doParallel)
+library(unbalanced)
+library(pROC)
+library(ROCR)
+library(neuralnet)
+library(keras)
+cl <- makePSOCKcluster(detectCores() - 1)
+registerDoParallel(cl)
+```
+
+# load data
+```{r}
+data <- read.csv("train.csv")
+str(data)
+head(data)
+```
+
+**Our response variable is IsUseful**
+
+```{r}
+# Summary Statistics
+
+summary(data)
+sum(is.na(data))
+```
+
+From the above summary statistics, we can see that the data set has no missing values.
+
+# Confirming columns and observation duplication
+```{r}
+sum(duplicated(data))
+sum(duplicated(as.list(data)))
+```
+
+```{r}
+table(data$IsUseful)
+```
+
+```{r}
+ggplot(data, aes(factor(IsUseful), fill = IsUseful)) + geom_bar() + labs(x = "Is Useful")
+```
+
+The above bar plot shows that response variable "IsUseful" is highly imbalanced, as the number of observations are small, so we can oversample the data to handle the issue of imbalance.
+
+#Data partitioning
+
+```{r}
+# Data partition: randomly split the data set into a train (80%) and a test set (20%)
+data0 <- data
+index <- 1:nrow(data)
+set.seed(123)
+train_index <- sample(index, round(length(index)*0.8))
+train_set <- data[train_index,]
+test_set <- data[-train_index,]
+```
+
+
+#OverSampling data
+
+```{r}
+outcome <- table(train_set$IsUseful)
+#outcome identify count of !ISUseful as minority class
+train_data0 <- train_set
+#train_data0
+
+minCount <- outcome[names(outcome)==1]
+
+data_bal <- ovun.sample(IsUseful~., data = train_set, method = "over", N = minCount*2)$data
+
+data0bal <- data_bal
+train_set <- data_bal
+
+table(train_set$IsUseful)
+```
+
+# Pridictive modeling
+
+# Model 1: k-NN
+
+Fit the k-NN model to the training data set.
+
+```{r}
+library(class)
+# Select the true values of the response in training set
+cll <- train_set[,"IsUseful"]
+# Use knn for k = 5, 20
+knn5 <- knn(train_set[,-1],test_set[,-1], cll, k = 5)
+knn20 <- knn(train_set[,-1],test_set[,-1], cll, k = 20)
+```
+
+Evaluate k-NN Models on Test Data set
+
+```{r}
+# Confusion matrix and statistics, k = 5
+confusionMatrix(knn5,factor(test_set$IsUseful))
+```
+
+```{r}
+# Confusion matrix and statistics, k = 20
+confusionMatrix(knn20,factor(test_set$IsUseful))
+```
+
+
+```{r}
+result.roc_knn <- roc(test_set$IsUseful, as.numeric(as.factor(knn20)))
+#table(test_data$IsUseful)
+#table(as.numeric(svm_yhat))
+
+plot(result.roc_knn, print.thres="best", print.thres.best.method="closest.topleft", print.auc=TRUE)
+knnAUC <- auc(result.roc_knn)
+knnAUC
+```
+
+
+# Model 2: Random Forest
+
+```{r}
+# Viraj
+# Fit a bagged tree
+rf_IsUseful <- randomForest(factor(IsUseful)~., data = train_set,
+                            mtry = 4, importance = TRUE)
+
+rf_IsUseful
+
+```
+
+
+Testing performance of bagged RF on test data set
+
+```{r}
+rf_yhat <- predict(rf_IsUseful, newdata = test_set)
+
+confusionMatrix(as.factor(rf_yhat), as.factor(test_set$IsUseful), positive = "1")
+
+```
+
+```{r}
+result.roc_rf <- roc(test_set$IsUseful, as.numeric(as.factor(rf_yhat)))
+#table(test_data$IsUseful)
+#table(as.numeric(svm_yhat))
+
+plot(result.roc_rf, print.thres="best", print.thres.best.method="closest.topleft", print.auc=TRUE)
+rfAUC <- auc(result.roc_rf)
+rfAUC
+```
+
+
+```{r}
+# plotting importance score
+varImpPlot(rf_IsUseful)
+```
+
+
+Let's further tune the parameter mtry by using a repeated 10-fold cross-validation.
+
+```{r}
+# using repeated cross validation 
+tunegrid <- data.frame(mtry = 1:9)
+
+tunegrid
+```
+
+
+```{r}
+library(lubridate) # for calculating difftime
+
+control <- trainControl(method = 'repeatedcv', 
+                        number = 10,
+                        repeats = 5)
+set.seed(123)
+
+# print out system time before training
+start_t <- Sys.time()
+cat("",cat("Training started at:",format(start_t, "%a %b %d %X %Y")))
+
+rf_tune <- train(IsUseful ~ ., data = train_set,
+                  method = 'rf',
+                  trControl = control,
+                  tuneGrid = tunegrid)
+
+# print out system time after training
+finish_t <- Sys.time()
+cat("",cat("Training finished at:",format(finish_t, "%a %b %d %X %Y")))
+
+cat("The training process finished in",difftime(finish_t,start_t,units="mins"), "minutes")
+
+print(rf_tune)
+# in the output we get the result for every mtry
+```
+
+
+```{r}
+
+# Manual Search
+control <- trainControl(method="repeatedcv", number=10, repeats=3, search="grid")
+tunegrid <- expand.grid(.mtry=c(sqrt(ncol(x))))
+modellist <- list()
+for (ntree in c(100, 200, 300)) {
+	set.seed(seed)
+	fit <- train(IsUseful~., data=train_set, method="rf", tuneGrid=tunegrid, trControl=control, ntree=ntree)
+	key <- toString(ntree)
+	modellist[[key]] <- fit
+}
+# compare results
+results <- resamples(modellist)
+summary(results)
+dotplot(results)
+```
+
+
+
+# Model 3: SVM
+
+# Data Normalization
+
+Normalizing data usine preProcess() method
+```{r}
+# Viraj
+# preProcess () is used to conduct normalization i.e., scaling
+preprocessParams <- preProcess(train_set, method = c("scale","center"))
+
+# summarize transform parameters
+print(preprocessParams)
+```
+
+
+```{r, include=FALSE}
+# transform the training dataset using the parameters
+# obtaining normalized the training dataset.
+train_scaled <- predict(preprocessParams, train_set)
+
+# summarize the transformed dataset
+stargazer::stargazer(train_scaled, type = 'text')
+```
+
+
+```{r, include=FALSE}
+# transform the test dataset using the parameters
+test_scaled <- predict(preprocessParams, test_set)
+
+# summarize the transformed dataset
+stargazer::stargazer(test_scaled, type = 'text')
+```
+
+
+# SVM with linear kernel
+```{r}
+svm_IsUseful <- svm(factor(IsUseful)~., data = train_scaled, 
+                   kernel = 'linear', cost = 100, scale = TRUE)
+
+summary(svm_IsUseful)
+```
+
+
+```{r}
+# Predict on the scaled test dataset i.e. predicting y_hat
+svm_yhat_scaled <- predict(svm_IsUseful, newdata = test_scaled)
+```
+
+
+```{r}
+confusionMatrix(as.factor(svm_yhat_scaled), as.factor(test_scaled$IsUseful))
+
+result.rocSVM <- roc(test_set$IsUseful, as.numeric(as.factor(svm_yhat_scaled)))
+#table(test_data$IsUseful)
+#table(as.numeric(svm_yhat))
+
+plot(result.rocSVM, print.thres="best", print.thres.best.method="closest.topleft", print.auc=TRUE)
+svmAUC <- auc(result.rocSVM)
+svmAUC
+```
+
+Using 5-fold cross validation to fine tune a linear kernel.
+```{r}
+set.seed(123)
+tune_svm_linear <- tune(svm, factor(IsUseful)~., data = train_scaled,
+                        kernel = 'linear',
+                        tunecontrol=tune.control(cross=5,sampling="cross"),
+                        ranges =list(cost=10^(-2:2))) # trying different values, # using Cv for best performance
+
+summary(tune_svm_linear)
+```
+
+
+```{r}
+# Print the best parameters
+tune_svm_linear$best.parameters
+```
+
+
+```{r}
+# Print the best performance
+tune_svm_linear$best.performance
+```
+
+```{r}
+# Predict on the scaled test dataset i.e. predicting y_hat
+svm_linear_tuned <- predict(svm_IsUseful, newdata = test_scaled)
+```
+
+
+```{r}
+result.rocSVM2 <- roc(test_set$IsUseful, as.numeric(as.factor(svm_linear_tuned)))
+svmAUC2 <- auc(result.rocSVM2)
+svmAUC2
+```
+
+
+# Model 4: GBM
+
+```{r}
+set.seed(123)
+library(gbm)
+
+gbm_model <- gbm(train_set$IsUseful ~., data = train_set,
+                 distribution = "gaussian",
+                 cv.folds = 10,
+                 shrinkage =.01,
+                 n.minobsinnode = 10,
+                 n.trees = 5000)
+
+print(gbm_model)
+
+```
+
+
+```{r}
+summary(gbm_model)
+```
+
+
+```{r}
+test1 <- test_set[,-710]
+test2 <- test_set[,710]
+gbm_pred <- predict.gbm(gbm_model, test_set)
+
+result.rocGBM <- roc(test_set$IsUseful, as.numeric(as.factor(gbm_pred)))
+plot(result.rocGBM, print.thres="best", print.thres.best.method="closest.topleft", print.auc=TRUE)
+GBM_AUC <- auc(result.rocGBM)
+GBM_AUC
+```
+
+
+# Model 5: ANN
+
+Using neuralnet() method to train the neural network model with 3 hidden layers.
+```{r}
+f <- as.formula(factor(IsUseful) ~ .)
+```
+
+```{r}
+library(neuralnet)
+
+f <- as.formula(factor(IsUseful) ~ .)
+
+# Fit a neural network model with 3 hidden layers
+nn_fit_1 <- neuralnet(f, data = train_scaled, hidden = c(4,3,2)) # mins
+
+# Show results
+summary(nn_fit_1)
+```
+
+
+```{r, fig.height=6, fig.width=7}
+plot(nn_fit_1,rep="best", cex=0.8)
+```
+
+```{r}
+# Fit a neural network model with 2 hidden layer
+nn_fit_2 <- neuralnet(f, data = train_scaled, hidden = c(3,2)) # mins
+
+# Show results
+summary(nn_fit_2)
+```
+
+```{r,fig.height=6, fig.width=7}
+#plotting neural net model with 2 hidden layers
+plot(nn_fit_2, rep="best",cex=0.8)
+```
+
+# Evaluating Predictive Performance of the Three-Hidden-Layer Model
+
+We use compute() method in the neuralnet package for predicting the performance.
+
+```{r}
+# Computing the outputs of all neurons for specific arbitrary co variate vectors given a trained neural network
+pred2_norm <- compute(nn_fit_1, test_scaled[-1])
+pred2_norm <- pred2_norm$net.result
+```
+
+```{r}
+# Transform the normalized IsUseful prediction to original scale
+pred2 <- pred2_norm*(max(train_set$IsUseful) 
+                     -min(train_set$IsUseful)) + min(data$IsUseful)
+
+```
+
+Calculating the prediction performance.
+```{r}
+result.roc5 <- roc(test_set$IsUseful, pred2_norm[,1])
+plot(result.roc5, print.thres="best", print.thres.best.method="closest.topleft", print.auc=TRUE)
+annAUC <- auc(result.roc5)
+annAUC
+```
+
+# Evaluating Predictive Performance of the Two-Hidden-Layer Model
+
+```{r}
+# Computes the outputs of all neurons for specific arbitrary co variate vectors given a trained neural network
+pred1_norm <- compute(nn_fit_2, test_scaled[-1])
+pred1_norm <- pred1_norm$net.result
+```
+
+
+```{r}
+# Transform the normalized ISUseful prediction to original scale
+pred1 <- pred1_norm*(max(train_set$IsUseful)
+                     - min(train_set$IsUseful)) + min(train_set$IsUseful)
+
+```
+
+
+```{r}
+result.roc6 <- roc(test_set$IsUseful, pred1_norm[,1])
+plot(result.roc6, print.thres="best", print.thres.best.method="closest.topleft", print.auc=TRUE)
+annAUC <- auc(result.roc6)
+annAUC
+```
+
+
+-------------------------------
+
+
+# Model 6:Deep learning
+
+```{r}
+paste0("Training entries: ", length(train_set), 
+       ", labels: ", length(train_labels))
+```
+
+
+#Specifying Deep Learning Model
+
+```{r}
+library(keras)
+library(tensorflow)
+#install_tensorflow(package_url = "https://pypi.python.org/packages/b8/d6/af3d52dd52150ec4a6ceb7788bfeb2f62ecb6aa2d1172211c4db39b349a2/tensorflow-1.3.0rc0-cp27-cp27mu-manylinux1_x86_64.whl#md5=1cf77a2360ae2e38dd3578618eacc03b")
+model <- keras_model_sequential()
+model %>% 
+  layer_dense(units = 64, activation = "relu", input_shape = c(13)) %>%
+  layer_dense(units = 16, activation = "relu") %>%
+  layer_dense(units = 1)
+
+model %>% summary()
+```
+
+
+```{r}
+model %>% compile(
+  optimizer = optimizer_rmsprop(),
+  loss = 'mse',
+  metrics = list('mean_absolute_error')
+)
+```
+
+# Training Deep learning model
+```{r}
+history <- model %>% fit(
+  x = as.matrix(train_scaled),
+  y = train_labels,
+  epochs = 100,
+  validation_data = list(as.matrix(test_scaled),
+                         test_labels),
+  verbose=1
+)
+```
+
+```{r}
+plot(history)
+```
+
+# Calculate Performance Metric on Test Data
+
+Now, let's use the test data to formally calculate the performance of the deep learning model. 
+
+```{r}
+test_predictions <- model %>% predict(as.matrix(test_scaled))
+
+postResample(test_predictions, test_labels) %>% round(3)
+```
+
+
+```{r}
+plot(test_labels,test_predictions)
+```
+
+
+```{r}
+stopCluster(cl)
+```
+
+
+
+
+
+
+
+
+
+
