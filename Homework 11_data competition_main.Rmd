@@ -40,7 +40,7 @@ head(data)
 
 **Our response variable is IsUseful**
 
-```{r}
+```{r, include=FALSE}
 # Summary Statistics
 
 summary(data)
@@ -90,6 +90,11 @@ minCount <- outcome[names(outcome)==1]
 
 data_bal <- ovun.sample(IsUseful~., data = train_set, method = "over", N = minCount*2)$data
 
+
+maxCount <- outcome[names(outcome)==0]
+data_under <- ovun.sample(IsUseful~., data = train_data0, method = "under", N = maxCount*2)$data
+train_set_under <- data_under
+
 data0bal <- data_bal
 train_set <- data_bal
 
@@ -100,15 +105,17 @@ table(train_set$IsUseful)
 
 # Model 1: k-NN
 
+
 Fit the k-NN model to the training data set.
 
 ```{r}
+#Viraj
 library(class)
 # Select the true values of the response in training set
-cll <- train_set[,"IsUseful"]
+cll <- train_set_under[,"IsUseful"]
 # Use knn for k = 5, 20
-knn5 <- knn(train_set[,-1],test_set[,-1], cll, k = 5)
-knn20 <- knn(train_set[,-1],test_set[,-1], cll, k = 20)
+knn5 <- knn(train_set_under[,-1],test_set[,-1], cll, k = 5)
+knn20 <- knn(train_set_under[,-1],test_set[,-1], cll, k = 10)
 ```
 
 Evaluate k-NN Models on Test Data set
@@ -133,13 +140,13 @@ plot(result.roc_knn, print.thres="best", print.thres.best.method="closest.toplef
 knnAUC <- auc(result.roc_knn)
 knnAUC
 ```
-
+**The model outfitted the train set, a clear case where you are getting a perfect AUC score, so we'll dump this model**
 
 # Model 2: Random Forest
 
 ```{r}
-# Viraj
-# Fit a bagged tree
+# Austin
+# Random forest
 rf_IsUseful <- randomForest(factor(IsUseful)~., data = train_set,
                             mtry = 4, importance = TRUE)
 
@@ -174,71 +181,13 @@ varImpPlot(rf_IsUseful)
 ```
 
 
-Let's further tune the parameter mtry by using a repeated 10-fold cross-validation.
-
-```{r}
-# using repeated cross validation 
-tunegrid <- data.frame(mtry = 1:9)
-
-tunegrid
-```
-
-
-```{r}
-library(lubridate) # for calculating difftime
-
-control <- trainControl(method = 'repeatedcv', 
-                        number = 10,
-                        repeats = 5)
-set.seed(123)
-
-# print out system time before training
-start_t <- Sys.time()
-cat("",cat("Training started at:",format(start_t, "%a %b %d %X %Y")))
-
-rf_tune <- train(IsUseful ~ ., data = train_set,
-                  method = 'rf',
-                  trControl = control,
-                  tuneGrid = tunegrid)
-
-# print out system time after training
-finish_t <- Sys.time()
-cat("",cat("Training finished at:",format(finish_t, "%a %b %d %X %Y")))
-
-cat("The training process finished in",difftime(finish_t,start_t,units="mins"), "minutes")
-
-print(rf_tune)
-# in the output we get the result for every mtry
-```
-
-
-```{r}
-
-# Manual Search
-control <- trainControl(method="repeatedcv", number=10, repeats=3, search="grid")
-tunegrid <- expand.grid(.mtry=c(sqrt(ncol(x))))
-modellist <- list()
-for (ntree in c(100, 200, 300)) {
-	set.seed(seed)
-	fit <- train(IsUseful~., data=train_set, method="rf", tuneGrid=tunegrid, trControl=control, ntree=ntree)
-	key <- toString(ntree)
-	modellist[[key]] <- fit
-}
-# compare results
-results <- resamples(modellist)
-summary(results)
-dotplot(results)
-```
-
-
-
 # Model 3: SVM
 
 # Data Normalization
 
 Normalizing data usine preProcess() method
 ```{r}
-# Viraj
+# Austin
 # preProcess () is used to conduct normalization i.e., scaling
 preprocessParams <- preProcess(train_set, method = c("scale","center"))
 
@@ -268,6 +217,7 @@ stargazer::stargazer(test_scaled, type = 'text')
 
 # SVM with linear kernel
 ```{r}
+#Austin
 svm_IsUseful <- svm(factor(IsUseful)~., data = train_scaled, 
                    kernel = 'linear', cost = 100, scale = TRUE)
 
@@ -282,6 +232,7 @@ svm_yhat_scaled <- predict(svm_IsUseful, newdata = test_scaled)
 
 
 ```{r}
+# Austin
 confusionMatrix(as.factor(svm_yhat_scaled), as.factor(test_scaled$IsUseful))
 
 result.rocSVM <- roc(test_set$IsUseful, as.numeric(as.factor(svm_yhat_scaled)))
@@ -332,6 +283,7 @@ svmAUC2
 # Model 4: GBM
 
 ```{r}
+# Viraj
 set.seed(123)
 library(gbm)
 
@@ -353,6 +305,7 @@ summary(gbm_model)
 
 
 ```{r}
+# Viraj
 test1 <- test_set[,-710]
 test2 <- test_set[,710]
 gbm_pred <- predict.gbm(gbm_model, test_set)
@@ -368,6 +321,7 @@ GBM_AUC
 
 Using neuralnet() method to train the neural network model with 3 hidden layers.
 ```{r}
+# Austin & Viraj
 f <- as.formula(factor(IsUseful) ~ .)
 ```
 
@@ -406,6 +360,7 @@ plot(nn_fit_2, rep="best",cex=0.8)
 We use compute() method in the neuralnet package for predicting the performance.
 
 ```{r}
+# Austin & Viraj
 # Computing the outputs of all neurons for specific arbitrary co variate vectors given a trained neural network
 pred2_norm <- compute(nn_fit_1, test_scaled[-1])
 pred2_norm <- pred2_norm$net.result
@@ -429,6 +384,7 @@ annAUC
 # Evaluating Predictive Performance of the Two-Hidden-Layer Model
 
 ```{r}
+# Austin & Viraj
 # Computes the outputs of all neurons for specific arbitrary co variate vectors given a trained neural network
 pred1_norm <- compute(nn_fit_2, test_scaled[-1])
 pred1_norm <- pred1_norm$net.result
@@ -450,72 +406,6 @@ annAUC <- auc(result.roc6)
 annAUC
 ```
 
-
--------------------------------
-
-
-# Model 6:Deep learning
-
-```{r}
-paste0("Training entries: ", length(train_set), 
-       ", labels: ", length(train_labels))
-```
-
-
-#Specifying Deep Learning Model
-
-```{r}
-library(keras)
-library(tensorflow)
-#install_tensorflow(package_url = "https://pypi.python.org/packages/b8/d6/af3d52dd52150ec4a6ceb7788bfeb2f62ecb6aa2d1172211c4db39b349a2/tensorflow-1.3.0rc0-cp27-cp27mu-manylinux1_x86_64.whl#md5=1cf77a2360ae2e38dd3578618eacc03b")
-model <- keras_model_sequential()
-model %>% 
-  layer_dense(units = 64, activation = "relu", input_shape = c(13)) %>%
-  layer_dense(units = 16, activation = "relu") %>%
-  layer_dense(units = 1)
-
-model %>% summary()
-```
-
-
-```{r}
-model %>% compile(
-  optimizer = optimizer_rmsprop(),
-  loss = 'mse',
-  metrics = list('mean_absolute_error')
-)
-```
-
-# Training Deep learning model
-```{r}
-history <- model %>% fit(
-  x = as.matrix(train_scaled),
-  y = train_labels,
-  epochs = 100,
-  validation_data = list(as.matrix(test_scaled),
-                         test_labels),
-  verbose=1
-)
-```
-
-```{r}
-plot(history)
-```
-
-# Calculate Performance Metric on Test Data
-
-Now, let's use the test data to formally calculate the performance of the deep learning model. 
-
-```{r}
-test_predictions <- model %>% predict(as.matrix(test_scaled))
-
-postResample(test_predictions, test_labels) %>% round(3)
-```
-
-
-```{r}
-plot(test_labels,test_predictions)
-```
 
 
 ```{r}
