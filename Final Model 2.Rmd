@@ -135,17 +135,17 @@ GBM_AUC
 ```{r}
 #Create Validation Set
 val_data <- read.csv("test.csv")
-valOriginal <- val_data
-val_data$Id <- NULL
+#valOriginal <- val_data
+#val_data$Id <- NULL
 val_data[factors] <- lapply(val_data[factors], factor)
 ```
 
 
 ```{r} 
 #Austin Final model check
-valFinal <- predict(gbm_model, newdata = val_data, type="prob")
+valFinal <- predict(gbm_model, newdata = val_data)
 
-result.rocF <- roc(val_data$IsUseful, valFinal[,1])
+result.rocF <- roc(val_data$IsUseful, as.numeric(as.factor(valFinal)))
 plot(result.rocF, print.thres="best", print.thres.best.method="closest.topleft", print.auc=TRUE)
 AUCF <- auc(result.rocF)
 AUCF
