@@ -1,0 +1,158 @@
+---
+title: "Final Model 2"
+author: "Austin Funcheon and Viraj Rane"
+date: "5/9/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# loading libraries
+```{r}
+# Importing all libraries
+library(caret)
+library(ggplot2)
+library(tidyr)
+library(dplyr)
+library(tree)
+library(ROSE)
+library(randomForest)
+library(lubridate)
+library(e1071)
+library(doParallel)
+library(unbalanced)
+library(pROC)
+library(ROCR)
+library(neuralnet)
+library(keras)
+cl <- makePSOCKcluster(detectCores() - 1)
+registerDoParallel(cl)
+```
+
+# load data
+```{r}
+data <- read.csv("train.csv")
+str(data)
+head(data)
+```
+
+**Our response variable is IsUseful**
+
+```{r}
+# Summary Statistics
+
+summary(data)
+sum(is.na(data))
+```
+
+From the above summary statistics, we can see that the data set has no missing values.
+
+# Confirming columns and observation duplication
+```{r}
+sum(duplicated(data))
+sum(duplicated(as.list(data)))
+```
+
+```{r}
+table(data$IsUseful)
+```
+
+```{r}
+ggplot(data, aes(factor(IsUseful), fill = IsUseful)) + geom_bar() + labs(x = "Is Useful")
+```
+
+The above bar plot shows that response variable "IsUseful" is highly imbalanced, as the number of observations are small, so we can oversample the data to handle the issue of imbalance.
+
+#Data partitioning
+
+```{r}
+# Data partition: randomly split the data set into a train (80%) and a test set (20%)
+data0 <- data
+index <- 1:nrow(data)
+set.seed(123)
+train_index <- sample(index, round(length(index)*0.8))
+train_set <- data[train_index,]
+test_set <- data[-train_index,]
+```
+
+
+#OverSampling data
+
+```{r}
+outcome <- table(train_set$IsUseful)
+#outcome identify count of !ISUseful as minority class
+train_data0 <- train_set
+#train_data0
+
+minCount <- outcome[names(outcome)==1]
+
+data_bal <- ovun.sample(IsUseful~., data = train_set, method = "over", N = minCount*2)$data
+
+data0bal <- data_bal
+train_set <- data_bal
+
+table(train_set$IsUseful)
+```
+
+# Model 4: GBM
+
+```{r}
+set.seed(123)
+library(gbm)
+
+gbm_model <- gbm(train_set$IsUseful ~., data = train_set,
+                 distribution = "gaussian",
+                 cv.folds = 10,
+                 shrinkage =.01,
+                 n.minobsinnode = 10,
+                 n.trees = 5000)
+
+print(gbm_model)
+
+```
+
+
+```{r}
+summary(gbm_model)
+```
+
+
+```{r}
+test1 <- test_set[,-710]
+test2 <- test_set[,710]
+gbm_pred <- predict.gbm(gbm_model, test_set)
+
+result.rocGBM <- roc(test_set$IsUseful, as.numeric(as.factor(gbm_pred)))
+plot(result.rocGBM, print.thres="best", print.thres.best.method="closest.topleft", print.auc=TRUE)
+GBM_AUC <- auc(result.rocGBM)
+GBM_AUC
+```
+
+
+
+```{r}
+#Create Validation Set
+val_data <- read.csv("test.csv")
+#valOriginal <- val_data
+#val_data$Id <- NULL
+val_data[factors] <- lapply(val_data[factors], factor)
+```
+
+
+```{r} 
+#Austin Final model check
+valFinal <- predict(gbm_model, newdata = val_data)
+
+result.rocF <- roc(val_data$IsUseful, as.numeric(as.factor(valFinal)))
+plot(result.rocF, print.thres="best", print.thres.best.method="closest.topleft", print.auc=TRUE)
+AUCF <- auc(result.rocF)
+AUCF
+```
+
+
+
+```{r}
+stopCluster(cl)
+```
