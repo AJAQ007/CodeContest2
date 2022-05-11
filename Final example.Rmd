@@ -139,7 +139,7 @@ for(i in 1:nrow(h_grid)) {
     verbose = FALSE
   )
   
-  # add min training error and trees to grid
+  #keep track  of best
   h_grid$index[i] <- which.min(gbm.tune$valid.error)
   h_grid$min_RMSE[i] <- sqrt(min(gbm.tune$valid.error))
 }
@@ -147,7 +147,8 @@ for(i in 1:nrow(h_grid)) {
 
 
 ```
-
+print( h_grid$index)
+print( h_grid$min_RMSE)
 
 
 ```{r}
@@ -166,6 +167,16 @@ GBM_AUC <- auc(result.rocGBM)
 GBM_AUC
 ```
 
+```{r}
+gbm_model <- gbm(train_set$IsUseful ~., data = train_set,
+                 distribution = "gaussian",
+                 cv.folds = 10,
+                 shrinkage =.01,
+                 n.minobsinnode = 10,
+                 n.trees = 500)
+
+print(gbm_model)
+```
 
 ```{r}
 #Create Validation Set
